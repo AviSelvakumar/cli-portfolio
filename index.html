@@ -1,0 +1,591 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+    <style>
+        :root {
+            --bg-color: #000000;
+            --text-color: #ffffff;
+            --user-color: #ffff00;
+            --cursor-color: #ffffff;
+            --link-color: #00ffff;
+            --link-hover-color: #00cccc;
+            --selection-bg: #ffffff;
+            --selection-color: #000000;
+        }
+        
+        body {
+            background-color: var(--bg-color);
+            overflow-x: hidden;
+            transition: background-color 0.3s ease;
+            margin-left: 1em;
+        }
+        .terminal {
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            font-family: "Major Mono Display", monospace;
+            font-size: 20px;
+            transition: background-color 0.3s ease, color 0.3s ease;
+            word-wrap: break-word;
+            overflow-wrap: break-word;
+            word-break: break-word;
+            white-space: pre-wrap;
+        }
+        .user {
+            color: var(--user-color);
+            transition: color 0.3s ease;
+        }
+        .prompt-line {
+            display: flex;
+            flex-wrap: nowrap;
+            align-items: flex-start;
+        }
+        .prompt-line .user {
+            flex: none;
+            white-space: pre;
+        }
+        .prompt-line .input-wrapper {
+            flex: 1;
+            min-width: 0;
+        }
+        .prompt-line .command-text {
+            flex: 1;
+            min-width: 0;
+            white-space: pre-wrap;
+        }
+        .input-wrapper {
+            display: inline-block;
+            position: relative;
+            white-space: nowrap;
+        }
+        .input {
+            border: 0;
+            outline: none;
+            caret-color: transparent;
+            background-color: transparent;
+            color: var(--text-color);
+            padding: 0;
+            margin: 0;
+            transition: color 0.3s ease;
+            width: 100%;
+            white-space: nowrap;
+
+        }
+        /* Style for the custom blinking block cursor */
+        .cursor {
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 0.5em;
+            height: 1em;
+            background-color: var(--cursor-color);
+            animation: terminalBlink 1s step-end infinite;
+            pointer-events: none;
+            transition: background-color 0.3s ease;
+        }
+        
+        @keyframes terminalBlink {
+            0%, 50% {
+                opacity: 1;
+            }
+            51%, 100% {
+                opacity: 0;
+            }
+        }
+
+        ::selection {
+            background-color: var(--selection-bg);
+            color: var(--selection-color);
+        }
+        
+        a {
+            color: var(--link-color);
+            text-decoration: underline;
+            cursor: pointer;
+            transition: color 0.3s ease;
+        }
+        
+        a:hover {
+            color: var(--link-hover-color);
+        }
+    </style>
+</head>
+<body spellcheck="false">
+    <div class="terminal" id = "terminal">
+        <div class="terminal prompt-line">
+            <span class="terminal user">aviselvak@portfolio:~$ </span><span class="input-wrapper">
+                <input type="text" class="terminal input" id="input">
+                <span class="cursor" id="cursor"></span>
+            </span>
+        </div>
+    </div>
+    <script>
+        const terminal = document.getElementById('terminal');
+        const prompt = 'aviselvak@portfolio:~$ ';
+        
+        // Helper functions to get current input and cursor
+        function getCurrentInput() {
+            return terminal.querySelector('.input-wrapper input');
+        }
+        
+        function getCurrentCursor() {
+            return terminal.querySelector('.input-wrapper .cursor');
+        }
+        
+        // Update cursor position as user types
+        function updateCursorPosition() {
+            const input = getCurrentInput();
+            const cursor = getCurrentCursor();
+            
+            if (!input || !cursor) return;
+            
+            // Create a temporary span to measure text width
+            const tempSpan = document.createElement('span');
+            tempSpan.style.visibility = 'hidden';
+            tempSpan.style.position = 'absolute';
+            tempSpan.style.whiteSpace = 'pre';
+            tempSpan.style.font = window.getComputedStyle(input).font;
+            tempSpan.style.fontSize = window.getComputedStyle(input).fontSize;
+            tempSpan.style.fontFamily = window.getComputedStyle(input).fontFamily;
+            tempSpan.style.fontWeight = window.getComputedStyle(input).fontWeight;
+            tempSpan.textContent = input.value.substring(0, input.selectionStart);
+            document.body.appendChild(tempSpan);
+            
+            // Position cursor absolutely at the end of the text
+            cursor.style.left = tempSpan.offsetWidth + 'px';
+            
+            document.body.removeChild(tempSpan);
+        }
+        
+        // Theme definitions
+        const themes = {
+            dark: {
+                bgColor: '#000000',
+                textColor: '#ffffff',
+                userColor: '#ffff00',
+                cursorColor: '#ffffff',
+                linkColor: '#00ffff',
+                linkHoverColor: '#00cccc',
+                selectionBg: '#ffffff',
+                selectionColor: '#000000'
+            },
+            neon: {
+                bgColor: '#0a0a0a',
+                textColor: '#00ff41',
+                userColor: '#ff00ff',
+                cursorColor: '#00ff41',
+                linkColor: '#00ffff',
+                linkHoverColor: '#00ff41',
+                selectionBg: '#ff00ff',
+                selectionColor: '#0a0a0a'
+            },
+            pink: {
+                bgColor: '#1a0a1a',
+                textColor: '#ffb3d9',
+                userColor: '#ff69b4',
+                cursorColor: '#ffb3d9',
+                linkColor: '#ff1493',
+                linkHoverColor: '#ff69b4',
+                selectionBg: '#ff69b4',
+                selectionColor: '#1a0a1a'
+            },
+            blue: {
+                bgColor: '#000a1a',
+                textColor: '#b3d9ff',
+                userColor: '#4da6ff',
+                cursorColor: '#b3d9ff',
+                linkColor: '#0066ff',
+                linkHoverColor: '#4da6ff',
+                selectionBg: '#4da6ff',
+                selectionColor: '#000a1a'
+            },
+            green: {
+                bgColor: '#0a1a0a',
+                textColor: '#b3ffb3',
+                userColor: '#00ff00',
+                cursorColor: '#b3ffb3',
+                linkColor: '#00cc00',
+                linkHoverColor: '#00ff00',
+                selectionBg: '#00ff00',
+                selectionColor: '#0a1a0a'
+            },
+            purple: {
+                bgColor: '#1a0a1a',
+                textColor: '#d9b3ff',
+                userColor: '#9966ff',
+                cursorColor: '#d9b3ff',
+                linkColor: '#9933ff',
+                linkHoverColor: '#9966ff',
+                selectionBg: '#9966ff',
+                selectionColor: '#1a0a1a'
+            },
+            orange: {
+                bgColor: '#1a0f0a',
+                textColor: '#ffd9b3',
+                userColor: '#ff9900',
+                cursorColor: '#ffd9b3',
+                linkColor: '#ff6600',
+                linkHoverColor: '#ff9900',
+                selectionBg: '#ff9900',
+                selectionColor: '#1a0f0a'
+            },
+            red: {
+                bgColor: '#1a0a0a',
+                textColor: '#ffb3b3',
+                userColor: '#ff3333',
+                cursorColor: '#ffb3b3',
+                linkColor: '#ff0000',
+                linkHoverColor: '#ff3333',
+                selectionBg: '#ff3333',
+                selectionColor: '#1a0a0a'
+            }
+        };
+        
+        // Function to apply a theme
+        function applyTheme(themeName) {
+            const theme = themes[themeName.toLowerCase()];
+            if (!theme) {
+                return false;
+            }
+            
+            const root = document.documentElement;
+            root.style.setProperty('--bg-color', theme.bgColor);
+            root.style.setProperty('--text-color', theme.textColor);
+            root.style.setProperty('--user-color', theme.userColor);
+            root.style.setProperty('--cursor-color', theme.cursorColor);
+            root.style.setProperty('--link-color', theme.linkColor);
+            root.style.setProperty('--link-hover-color', theme.linkHoverColor);
+            root.style.setProperty('--selection-bg', theme.selectionBg);
+            root.style.setProperty('--selection-color', theme.selectionColor);
+            
+            // Store theme in localStorage
+            localStorage.setItem('terminalTheme', themeName.toLowerCase());
+            
+            return true;
+        }
+        
+        // Load saved theme on page load
+        const savedTheme = localStorage.getItem('terminalTheme');
+        if (savedTheme && themes[savedTheme]) {
+            applyTheme(savedTheme);
+        }
+        
+        // Command handler object
+        const commandHandler = {
+            welcome: () => {
+                return ` 
+${
+    (window.innerWidth || document.documentElement.clientWidth) >= 900
+    ? ` █████╗ ██╗   ██╗██╗███╗   ██╗ █████╗ ███████╗██╗  ██╗    
+██╔══██╗██║   ██║██║████╗  ██║██╔══██╗██╔════╝██║  ██║    
+███████║██║   ██║██║██╔██╗ ██║███████║███████╗███████║    
+██╔══██║╚██╗ ██╔╝██║██║╚██╗██║██╔══██║╚════██║██╔══██║    
+██║  ██║ ╚████╔╝ ██║██║ ╚████║██║  ██║███████║██║  ██║    
+╚═╝  ╚═╝  ╚═══╝  ╚═╝╚═╝  ╚═══╝╚═╝  ╚═╝╚══════╝╚═╝  ╚═╝   
+`
+    : `
+ █████████████████████████████████
+█                                 █
+█   ▄▀▄ █ █ █ █▄ █ ▄▀▄ ▄▀▀ █▄█    █
+█   █▀█ ▀▄▀ █ █ ▀█ █▀█ ▄██ █ █    █
+█                                 █
+ █████████████████████████████████ `
+}
+ 
+Welcome to my website!
+Type help for a list of available commands
+ 
+Available commands:
+  help
+  ↳ Display help message
+  clear
+  ↳ Clear the terminal
+  whoami
+  ↳ Display information about me
+  projects
+  ↳ List my portfolio projects
+  contact
+  ↳ Display contact information
+  theme
+  ↳ Change terminal theme
+   
+  `
+            },
+            help: () => {
+                return `Available commands:
+  help
+  ↳ Display this help message
+  clear
+  ↳ Clear the terminal
+  whoami
+  ↳ Display information about me
+  projects
+  ↳ List my portfolio projects
+  contact
+  ↳ Display contact information
+  theme [theme_name]
+  ↳ Change terminal theme (use 'theme list' to see available themes)`;
+            },
+            clear: () => {
+                // Remove all children
+                while (terminal.firstChild) {
+                    terminal.removeChild(terminal.firstChild);
+                }
+                // Create a fresh prompt
+                createNewPrompt();
+                return null; // Don't display output for clear
+            },
+            whoami: () => {
+                return `
+ 
+Hello! My name is Avinash!
+I enjoy programming in my free time, and I mainly use Python, HTML/CSS/JS, and C++.
+On the side, I do comissions on Roblox. If you are interested, type 'contact' for my contact information.
+My favorite color is black, and I like to listen to music in my free time. I really like Frank Ocean,
+especially his album Channel Orange.
+ 
+Type 'help' to see available commands.`;
+            },
+            projects: () => {
+                return `Projects:
+
+1. justvibing.app: A fun experiment where every page is generated on-the-fly by AI
+2. Poison Template (roblox.com/games/132525552482439/Poison-Template): A game template for Roblox with monetization features that can be 
+quickly deployed and customized to fit any theme
+3. aviselvakumar.github.io/APUSH-LEQ-Practice: Practice page that I made to study for my APs. Grades your APUSH LEQs using an LLM.
+
+Type 'help' for more commands.`;
+            },
+            contact: () => {
+                return `Contact Information:
+
+Email: aviselvakdev@gmail.com
+GitHub: https://github.com/AviSelvak
+Discord: @avinaskselvakumar (https://discordapp.com/channels/@me/897920475269853205)
+
+Feel free to reach out!`;
+            },
+            theme: (args) => {
+                if (args.length === 0 || (args.length === 1 && args[0].toLowerCase() === 'list')) {
+                    const themeList = Object.keys(themes).join(', ');
+                    return `Available themes:
+  ${themeList}
+
+Usage: theme [theme_name]
+Example: theme neon`;
+                }
+                
+                const themeName = args[0].toLowerCase();
+                if (applyTheme(themeName)) {
+                    return `Theme changed to: ${themeName}`;
+                } else {
+                    return `Theme '${themeName}' not found. Available themes: ${Object.keys(themes).join(', ')}`;
+                }
+            },
+        };
+        
+        // Function to convert URLs and emails to clickable links
+        function formatLinks(text) {
+            // Email regex - process first to avoid conflicts
+            const emailRegex = /([a-zA-Z0-9._-]+@[a-zA-Z0-9._-]+\.[a-zA-Z0-9_-]+)/g;
+            
+            let formatted = text;
+            
+            // Replace emails first (to avoid double-processing)
+            formatted = formatted.replace(emailRegex, (match) => {
+                return `<a href="mailto:${match}">${match}</a>`;
+            });
+            
+            // URL regex: matches URLs with protocol, allowing all URL-valid characters
+            // Pattern: protocol://domain/path - stops at whitespace or trailing punctuation
+            const urlRegex = /(https?:\/\/[^\s<>"']+?)([.,:;!?)]+)?(?=\s|$|\))/g;
+            
+            formatted = formatted.replace(urlRegex, (fullMatch, url, trailingPunct) => {
+                // Skip if already inside an anchor tag
+                if (fullMatch.includes('</a>') || fullMatch.includes('<a')) {
+                    return fullMatch;
+                }
+                return `<a href="${url}" target="_blank" rel="noopener noreferrer">${url}</a>${trailingPunct || ''}`;
+            });
+            
+            // Match www. URLs
+            const wwwRegex = /(www\.[^\s<>"']+?)([.,:;!?)]+)?(?=\s|$|\))/g;
+            formatted = formatted.replace(wwwRegex, (fullMatch, url, trailingPunct) => {
+                if (fullMatch.includes('</a>') || fullMatch.includes('<a')) {
+                    return fullMatch;
+                }
+                const fullUrl = 'https://' + url;
+                return `<a href="${fullUrl}" target="_blank" rel="noopener noreferrer">${url}</a>${trailingPunct || ''}`;
+            });
+            
+            // Match domain-only URLs (domain.tld/path) - handles multi-part domains like github.io
+            // This pattern matches: subdomain.domain.tld or just domain.tld, with optional path
+            const domainRegex = /([a-zA-Z0-9](?:[a-zA-Z0-9-]*[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]*[a-zA-Z0-9])?)*\.[a-zA-Z]{2,}(?:\/[^\s<>"'.,:;!?)]*)?)([.,:;!?)]+)?(?=\s|$|\))/g;
+            formatted = formatted.replace(domainRegex, (fullMatch, url, trailingPunct) => {
+                if (fullMatch.includes('</a>') || fullMatch.includes('<a') || fullMatch.includes('@')) {
+                    return fullMatch;
+                }
+                const fullUrl = 'https://' + url;
+                return `<a href="${fullUrl}" target="_blank" rel="noopener noreferrer">${url}</a>${trailingPunct || ''}`;
+            });
+            
+            return formatted;
+        }
+        
+        // Function to append a line to the terminal
+        function appendLine(text, className = '') {
+            // Split text by newlines and create a line for each
+            const lines = text.split('\n');
+            
+            lines.forEach((lineText, index) => {
+                const line = document.createElement('div');
+                line.className = className ? `terminal ${className}` : 'terminal';
+                line.style.whiteSpace = 'pre-wrap';
+                
+                // Format links and set as innerHTML instead of textContent
+                const formattedText = formatLinks(lineText);
+                line.innerHTML = formattedText;
+                
+                // Find the current prompt line (last div with input-wrapper or the input-wrapper itself)
+                const currentPrompt = terminal.querySelector('.input-wrapper')?.closest('div') || 
+                                      terminal.querySelector('.input-wrapper')?.parentElement;
+                
+                if (currentPrompt && currentPrompt.parentNode === terminal) {
+                    terminal.insertBefore(line, currentPrompt);
+                } else {
+                    // Fallback: insert before last child
+                    terminal.insertBefore(line, terminal.lastElementChild);
+                }
+            });
+        }
+        
+        // Function to append a command line with proper prompt styling
+        function appendCommandLine(command) {
+            const line = document.createElement('div');
+            line.className = 'terminal prompt-line';
+            
+            const promptSpan = document.createElement('span');
+            promptSpan.className = 'terminal user';
+            promptSpan.textContent = prompt;
+            
+            const commandSpan = document.createElement('span');
+            commandSpan.className = 'terminal command-text';
+            commandSpan.textContent = command;
+            
+            line.appendChild(promptSpan);
+            line.appendChild(commandSpan);
+            
+            // Find the current prompt line
+            const currentPrompt = terminal.querySelector('.input-wrapper')?.closest('div') || 
+                                  terminal.querySelector('.input-wrapper')?.parentElement;
+            
+            if (currentPrompt && currentPrompt.parentNode === terminal) {
+                terminal.insertBefore(line, currentPrompt);
+            } else {
+                // Fallback: insert before last child
+                terminal.insertBefore(line, terminal.lastElementChild);
+            }
+        }
+        
+        // Function to create a new prompt line
+        function createNewPrompt() {
+            const promptLine = document.createElement('div');
+            promptLine.className = 'terminal prompt-line';
+            promptLine.innerHTML = `<span class="terminal user">${prompt}</span><span class="input-wrapper"><input type="text" class="terminal input"><span class="cursor"></span></span>`;
+            
+            // Remove old input wrapper (could be standalone or in a div)
+            const oldInputWrapper = terminal.querySelector('.input-wrapper');
+            if (oldInputWrapper) {
+                const parent = oldInputWrapper.parentNode;
+                // If input-wrapper is in a div, remove the whole div, otherwise just the wrapper
+                if (parent.classList && parent.classList.contains('terminal') && parent !== terminal) {
+                    parent.remove();
+                } else {
+                    oldInputWrapper.remove();
+                }
+            }
+            
+            // Insert new prompt
+            terminal.appendChild(promptLine);
+            
+            // Get new input and cursor
+            const newInput = promptLine.querySelector('input');
+            const newCursor = promptLine.querySelector('.cursor');
+            
+            // Add event listeners to new input
+            newInput.addEventListener('input', updateCursorPosition);
+            newInput.addEventListener('keyup', updateCursorPosition);
+            newInput.addEventListener('click', updateCursorPosition);
+            newInput.addEventListener('keydown', handleKeyDown);
+            
+            // Focus the new input
+            newInput.focus();
+            
+            // Update cursor position
+            updateCursorPosition();
+        }
+        
+        // Handle command execution
+        function executeCommand(command) {
+            const trimmedCommand = command.trim();
+            
+            if (!trimmedCommand) {
+                return;
+            }
+            
+            const commandParts = trimmedCommand.split(' ');
+            const commandName = commandParts[0].toLowerCase();
+            const args = commandParts.slice(1);
+            
+            // Display the command with prompt (preserving styling)
+            appendCommandLine(trimmedCommand);
+            
+            // Execute command
+            if (commandHandler[commandName]) {
+                const output = commandHandler[commandName](args);
+                if (output !== null) {
+                    appendLine(output);
+                }
+            } else {
+                appendLine(`Command not found: ${commandName}. Type 'help' for available commands.`);
+            }
+            
+            // Create new prompt line
+            createNewPrompt();
+            
+            // Scroll to bottom
+            setTimeout(() => {
+                window.scrollTo(0, document.body.scrollHeight);
+            }, 0);
+        }
+        
+        // Handle keydown events
+        function handleKeyDown(event) {
+            if (event.key === 'Enter') {
+                event.preventDefault();
+                const input = getCurrentInput();
+                if (input) {
+                    const command = input.value;
+                    executeCommand(command);
+                }
+            }
+        }
+        
+        // Initialize: add event listeners to initial input
+        executeCommand("clear")
+        executeCommand("welcome")
+        applyTheme("pink")
+        const initialInput = getCurrentInput();
+        if (initialInput) {
+            initialInput.focus();
+            initialInput.addEventListener('input', updateCursorPosition);
+            initialInput.addEventListener('keyup', updateCursorPosition);
+            initialInput.addEventListener('click', updateCursorPosition);
+            initialInput.addEventListener('keydown', handleKeyDown);
+            updateCursorPosition();
+        }
+    </script>
+</body>
+</html>
